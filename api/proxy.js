@@ -8,27 +8,20 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.BRAWL_API_KEY;
-
   if (!apiKey) {
     return res.status(500).json({ error: 'API key not configured' });
   }
 
-  // получаем путь из query-параметра
-  let path = req.query.path || '';
-  if (Array.isArray(path)) {
-    path = path.join('/');
+  // путь берём из req.url после /api/proxy
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const path = url.pathname.replace(/^\/api\/proxy\/?/, '');
+  const queryStr = url.search;
+
+  if (!path) {
+    return res.status(400).json({ error: 'No path provided. Use /api/proxy/players/%23TAG' });
   }
 
-  // собираем query-строку для проброса
-  const queryParams = new URLSearchParams();
-  for (const [key, value] of Object.entries(req.query)) {
-    if (key !== 'path') {
-      queryParams.append(key, value);
-    }
-  }
-  const queryStr = queryParams.toString();
-
-  const targetUrl = `https://api.brawlstars.com/v1/${path}${queryStr ? '?' + queryStr : ''}`;
+  const targetUrl = `https://api.brawlstars.com/v1/${path}${queryStr}`;
 
   try {
     const response = await fetch(targetUrl, {
@@ -40,7 +33,6 @@ export default async function handler(req, res) {
     });
 
     const data = await response.text();
-
     res.status(response.status);
     res.setHeader('Content-Type', 'application/json');
     return res.send(data);
